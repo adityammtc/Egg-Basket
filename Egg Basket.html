@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Egg Basket</title>
+<style>
+body {
+  background-color: #f0f0f0;
+  margin: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  overflow: hidden;
+}
+#gameContainer {
+  width: 600px;
+  height: 400px;
+  position: relative;
+  border: 5px solid #77dd77;
+  border-radius: 10px;
+  overflow: hidden;
+  background: linear-gradient(to bottom, #e0ffff, #add8e6);
+  box-shadow: 5px 5px 10px rgba(0,0,0,0.3);
+}
+#gameCanvas, #menuScreen {
+  width: 100%;
+  height: 100%;
+  display: none;
+}
+#bucket {
+  display: none;
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 80px;
+  height: 60px;
+  background-color: #8b4513;
+  border-radius: 0 0 10px 10px;
+}
+#scoreDisplay {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  font-size: 20px;
+  font-weight: bold;
+  color: #333;
+  text-shadow: 1px 1px 2px white;
+}
+#missDisplay {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  font-size: 20px;
+  font-weight: bold;
+  color: #333;
+  text-shadow: 1px 1px 2px white;
+}
+.egg {
+  position: absolute;
+  width: 20px;
+  height: 30px;
+  background-color: #fff;
+  border-radius: 50% 50% 30% 30%;
+  box-shadow: 2px 2px 0 #BE8C5A;
+}
+#menuScreen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(240, 240, 240, 0.9);
+}
+#menuScreen h1 {
+  font-size: 36px;
+  color: #333;
+  margin-bottom: 20px;
+}
+#menuScreen button {
+  width: 200px;
+  padding: 10px;
+  font-size: 18px;
+  margin: 10px;
+  cursor: pointer;
+  border-radius: 5px;
+  border: none;
+  background-color: #8b4513;
+  color: white;
+  transition: background-color 0.3s;
+}
+#menuScreen button:hover {
+  background-color: #6b3c13;
+}
+#playerNameBoard {
+  position: absolute;
+  top: 10px;
+  right: 100px;
+  font-size: 18px;
+  font-weight: bold;
+  color: #333;
+  text-shadow: 1px 1px 2px white;
+}
+#creditButton, #switchUserButton {
+  position: absolute;
+  font-size: 14px;
+  cursor: pointer;
+  color: #333;
+  background-color: #e0e0e0;
+  padding: 5px;
+  border-radius: 5px;
+}
+#creditButton {
+  left: 10px;
+  bottom: 10px;
+}
+#switchUserButton {
+  right: 10px;
+  bottom: 10px;
+}
+/* Panel Credit */
+#creditPanel, #highScorePanel {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 300px;
+  padding: 20px;
+  background-color: #fff;
+  box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
+  border-radius: 10px;
+  text-align: center;
+  display: none; /* Awalnya tersembunyi */
+}
+#creditPanel h2, #highScorePanel h2 {
+  font-size: 24px;
+  color: #333;
+}
+#creditPanel p, #highScorePanel p {
+  font-size: 18px;
+  color: #555;
+}
+#creditPanel button, #highScorePanel button {
+  margin-top: 15px;
+  padding: 8px 16px;
+  font-size: 16px;
+  cursor: pointer;
+  border-radius: 5px;
+  border: none;
+  background-color: #8b4513;
+  color: white;
+}
+</style>
+</head>
+<body>
+<div id="gameContainer">
+    <div id="menuScreen">
+        <h1>Egg Basket</h1>
+        <button onclick="startGame()">Start Game</button>
+        <button onclick="showHighScore()">High Score</button>
+    </div>
+    <canvas id="gameCanvas"></canvas>
+    <div id="bucket"></div>
+    <div id="scoreDisplay">Skor: 0</div>
+    <div id="missDisplay">Miss: 0</div>
+    <div id="playerNameBoard">Player: John Doe</div>
+    <div id="creditButton" onclick="showCredits()">Credit</div>
+    <div id="switchUserButton" onclick="switchUser()">Switch User</div>
+
+    <!-- Panel Credit -->
+    <div id="creditPanel">
+        <h2>Credits</h2>
+        <p>Yohana</p>
+        <p>Fatah</p>
+        <p>Adit</p>
+        <button onclick="closeCredits()">Close</button>
+    </div>
+  
+    <!-- Panel High Score -->
+    <div id="highScorePanel">
+        <h2>High Scores</h2>
+        <div id="highScoreList"></div>
+        <button onclick="closeHighScore()">Close</button>
+    </div>
+</div>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const bucket = document.getElementById('bucket');
+const gameContainer = document.getElementById('gameContainer');
+const scoreDisplay = document.getElementById('scoreDisplay');
+const missDisplay = document.getElementById('missDisplay');
+const menuScreen = document.getElementById('menuScreen');
+const creditPanel = document.getElementById('creditPanel');
+
+let bucketX = (gameContainer.clientWidth - bucket.clientWidth) / 2;
+let eggs = [];
+let score = 0;
+let missCount = 0;
+let eggSpeed = 1;
+let createEggInterval = 2000;
+let gameLoopInterval;
+let difficultyIncreaseInterval;
+let playerName = "John Doe"; // Nama pemain bisa diubah sesuai input pengguna
+
+function createEgg() {
+    const egg = document.createElement('div');
+    egg.classList.add('egg');
+    egg.style.left = Math.random() * (gameContainer.clientWidth - 20) + 'px';
+    egg.style.top = '-30px';
+    gameContainer.appendChild(egg);
+    eggs.push(egg);
+}
+
+function moveEggs() {
+    for (let i = 0; i < eggs.length; i++) {
+        let eggTop = parseInt(eggs[i].style.top);
+        eggs[i].style.top = (eggTop + eggSpeed) + 'px';
+
+        if (eggTop + 30 > gameContainer.clientHeight - bucket.clientHeight &&
+            parseInt(eggs[i].style.left) + 20 > bucketX &&
+            parseInt(eggs[i].style.left) < bucketX + bucket.clientWidth) {
+                eggs[i].remove();
+                eggs.splice(i, 1);
+                score++;
+                scoreDisplay.textContent = "Skor: " + score;
+                i--;
+        } else if (eggTop > gameContainer.clientHeight) {
+                eggs[i].remove();
+                eggs.splice(i, 1);
+                missCount++;
+                missDisplay.textContent = "Miss: " + missCount;
+                if (missCount >= 3) {
+                    gameOver();
+                }
+                i--;
+        }
+    }
+}
+
+function gameOver() {
+    clearInterval(gameLoopInterval);
+    clearInterval(difficultyIncreaseInterval);
+    clearInterval(createEggIntervalId);
+    alert("Game Over! Skor Anda: " + score);
+    
+    saveScore(playerName, score); // Simpan skor setelah kalah
+    resetGame();
+}
+
+function resetGame() {
+    score = 0;
+    missCount = 0;
+    eggSpeed = 1;
+    createEggInterval = 2000;
+    scoreDisplay.textContent = "Skor: " + score;
+    missDisplay.textContent = "Miss: " + missCount;
+    eggs.forEach(egg => egg.remove());
+    eggs = [];
+    showMenu();
+}
+
+function increaseDifficulty() {
+    eggSpeed *= 1.1;
+    createEggInterval *= 0.9;
+    clearInterval(createEggIntervalId);
+    createEggIntervalId = setInterval(createEgg, createEggInterval);
+}
+
+function gameLoop() {
+    moveEggs();
+}
+
+document.addEventListener('mousemove', (e) => {
+  let containerRect = gameContainer.getBoundingClientRect();
+  bucketX = e.clientX - containerRect.left - bucket.clientWidth / 2;
+  bucketX = Math.max(0, Math.min(bucketX, gameContainer.clientWidth - bucket.clientWidth));
+  bucket.style.left = bucketX + 'px';
+});
+
+function showMenu() {
+  menuScreen.style.display = 'flex';
+    gameCanvas.style.display = 'none';
+    scoreDisplay.style.display = 'none';
+    missDisplay.style.display = 'none';
+    bucket.style.display = 'none';
+    document.getElementById('creditButton').style.display = 'block'; // Tampilkan kembali tombol Credit
+    document.getElementById('switchUserButton').style.display = 'block'; // Tampilkan kembali tombol Switch User
+}
+
+function startGame() {
+  menuScreen.style.display = 'none';
+    gameCanvas.style.display = 'block';
+    scoreDisplay.style.display = 'block';
+    missDisplay.style.display = 'block';
+    bucket.style.display = 'block';
+    document.getElementById('creditButton').style.display = 'none'; // Sembunyikan tombol Credit
+    document.getElementById('switchUserButton').style.display = 'none'; // Sembunyikan tombol Switch User
+    
+    gameLoopInterval = setInterval(gameLoop, 16);
+    difficultyIncreaseInterval = setInterval(increaseDifficulty, 5000);
+    createEggIntervalId = setInterval(createEgg, createEggInterval);
+}
+
+function showCredits() {
+    creditPanel.style.display = 'block';
+}
+
+function closeCredits() {
+    creditPanel.style.display = 'none';
+}
+
+function switchUser() {
+    playerName = prompt("Masukkan nama pemain:");
+    document.getElementById("playerNameBoard").textContent = "Player: " + playerName;
+}
+
+function saveScore(name, score) {
+    let highScores = JSON.parse(localStorage.getItem("highScores")) || [];
+    highScores.push({ name: name, score: score });
+    highScores.sort((a, b) => b.score - a.score);
+    highScores = highScores.slice(0, 5);
+    localStorage.setItem("highScores", JSON.stringify(highScores));
+}
+
+function showHighScore() {
+    const highScoreList = document.getElementById("highScoreList");
+    const highScores = JSON.parse(localStorage.getItem("highScores")) || [];
+    
+    highScoreList.innerHTML = highScores.map((entry, index) => 
+        `<p>${index + 1}. ${entry.name} - Skor: ${entry.score}</p>`
+    ).join("");
+
+    document.getElementById("highScorePanel").style.display = 'block';
+}
+
+function closeHighScore() {
+    document.getElementById("highScorePanel").style.display = 'none';
+}
+</script>
+</body>
+</html>
